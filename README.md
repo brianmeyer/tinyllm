@@ -43,8 +43,8 @@ I started with a vanilla GPT-2-style transformer, then swapped in four upgrades 
 
 | Model | Best Val Loss | Training Time |
 |-------|-------------|--------------|
-| Vanilla (10.8M params) | 1.4837 | 57 min |
-| **Modern (10.6M params)** | **1.4783** | **67 min** |
+| Vanilla (10.8M params) | 1.4804 | 57 min |
+| **Modern (10.6M params)** | **1.4754** | **64 min** |
 
 ```
 ROMEO:

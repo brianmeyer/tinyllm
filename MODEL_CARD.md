@@ -95,8 +95,8 @@ Four upgrades over vanilla GPT-2, each tested in isolation:
 
 | Model | Params | Best Val Loss | Time |
 |-------|--------|-------------|------|
-| Vanilla | 10.8M | 1.4837 | 57 min |
-| **Modern** | **10.6M** | **1.4754** | **67 min** |
+| Vanilla | 10.8M | 1.4804 | 57 min |
+| **Modern** | **10.6M** | **1.4754** | **64 min** |
 
 Modern beats vanilla with fewer params. RoPE was the star — biggest single improvement.
 

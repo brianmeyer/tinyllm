@@ -458,9 +458,11 @@ After the BPE divergence, we tried retraining the modern model with fixes:
 
 ### Colab Training Results — All Three Phases
 
-Ran `train_colab.py` on a free T4 GPU. All three training phases ran back-to-back with zero crashes. Total wall time: ~3.2 hours. CUDA just works.
+First run on free T4: completed but checkpoints lost to runtime disconnect. Second run on Colab Pro T4: completed with Google Drive saving. All three training phases ran back-to-back with zero crashes. Total wall time: ~3.1 hours. CUDA just works.
 
-#### Part 1: Vanilla GPT (59.7 min, best val 1.4837)
+*Final numbers below are from the Colab Pro run.*
+
+#### Part 1: Vanilla GPT (56.9 min, best val 1.4804)
 
 | Step | Train | Val | Status |
 |------|-------|-----|--------|
@@ -478,7 +480,7 @@ Ran `train_colab.py` on a free T4 GPU. All three training phases ran back-to-bac
 
 Best checkpoint at step 3000. After that, val loss climbs while train keeps dropping — classic overfitting on a small dataset.
 
-#### Part 2: Modern GPT with dropout 0.3 (66.9 min, best val 1.4783)
+#### Part 2: Modern GPT with dropout 0.3 (64.2 min, best val 1.4754)
 
 | Step | Train | Val | Status |
 |------|-------|-----|--------|
@@ -494,7 +496,7 @@ Best checkpoint at step 3000. After that, val loss climbs while train keeps drop
 | 4500 | 0.91 | 1.52 | |
 | 5000 | 0.87 | 1.55 | |
 
-**Modern beat vanilla**: best val 1.4783 vs 1.4837. Small margin, but modern got there 500 steps sooner (step 2500 vs step 3000). The dropout 0.3 was the key fix — it pushed the overfitting point from step 1500 (with dropout 0.2) to step 2500.
+**Modern beat vanilla**: best val 1.4754 vs 1.4804. Small margin, but modern got there 500 steps sooner (step 2500 vs step 3000). The dropout 0.3 was the key fix — it pushed the overfitting point from step 1500 (with dropout 0.2) to step 2500.
 
 **Head-to-head at each step:**
 
@@ -503,7 +505,7 @@ Best checkpoint at step 3000. After that, val loss climbs while train keeps drop
 | 500 | 1.93 | 1.67 | **-0.26** |
 | 1000 | 1.63 | 1.53 | **-0.10** |
 | 2000 | 1.50 | 1.48 | **-0.02** |
-| Best | 1.4837 (step 3000) | **1.4783** (step 2500) | **-0.005, 500 steps faster** |
+| Best | 1.4804 (step 3000) | **1.4754** (step 2500) | **-0.005, 500 steps faster** |
 
 #### Part 3: BPE + Modern + Gradient Accumulation (68.2 min, best val 4.6414)
 
@@ -561,7 +563,13 @@ Both produce recognizable Shakespeare with proper character names and dialogue f
 
 **Surprise**: Vanilla is faster! The modern model's KV cache overhead (managing cache state, extra RoPE computation) outweighs the cache benefit at this tiny sequence length (256 tokens). KV cache pays off at longer contexts (2048+). At our scale, the extra complexity slows things down.
 
-**This is another real lesson**: Architecture improvements that win at scale can lose at small scale. RoPE + SwiGLU + KV cache are designed for billion-parameter models processing thousands of tokens. At 10M params and 256 tokens, the simpler vanilla architecture has less overhead.
+**Why is KV cache slower at our scale?** Three reasons:
+
+1. **The model is too small** — each forward pass takes microseconds. Cache management overhead (concatenating tensors, tracking positions, RoPE angle computation) is a larger fraction of total compute than the savings from not recomputing K/V.
+2. **Our sequences are short** — 256 tokens max. KV cache saves recomputing K/V for all previous tokens. At 256 tokens that's a small saving. At 128K tokens (Claude/GPT-4 scale) it would be ~500× faster.
+3. **Python loop overhead** — our attention heads run in a Python for-loop. Production systems use fused CUDA kernels (Flash Attention) where KV cache is nearly free.
+
+**The real lesson**: Architecture improvements that win at scale can lose at small scale. RoPE + SwiGLU + KV cache are designed for billion-parameter models processing thousands of tokens. At 10M params and 256 tokens, the simpler vanilla architecture has less overhead. But the modern architecture **trained better** — that's where the real value shows.
 
 ---
 

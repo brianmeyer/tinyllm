@@ -414,7 +414,7 @@ The key detail: we divide the loss by `ACCUM_STEPS` before calling `.backward()`
 
 We also add **gradient clipping** (`max_norm=1.0`) — if any gradient gets too large, we scale the entire gradient vector down to keep its norm ≤ 1.0. This prevents training instability from gradient spikes.
 
-*Results: [pending — will run after swap comparisons]*
+*Results: See "Colab Training Results" section below for BPE + gradient accumulation numbers.*
 
 ---
 

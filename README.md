@@ -59,7 +59,7 @@ Which hath a sin by him come to the crown,
 That he is reports for me; for ever is he.
 ```
 
-*A 10M parameter model generating Shakespeare dialogue after 67 minutes of training.*
+*A 10M parameter model generating Shakespeare dialogue after 64 minutes of training.*
 
 ## Project structure
 

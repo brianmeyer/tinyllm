@@ -82,27 +82,28 @@ This is an **educational model**. It is not intended for production use. It gene
 
 ## Sample Outputs
 
-**Prompt: "ROMEO:", temperature=0.8:**
+**Modern model, prompt: "ROMEO:", temperature=0.8:**
 ```
 ROMEO:
-Marry, good day with me!
-
-ROMEO:
-And not your lady command her at arms.
-
-THOMAS MOWBRAY:
-My dear lord, but go on.
+A gallant-house! what says the woe?
 
 MERCUTIO:
-Hence will not speak against a marriage.
+Good madam, my lord.
+
+ROMEO:
+Villain, for I do not say it is true,
+Which hath a sin by him come to the crown,
+That he is reports for me; for ever is he.
 ```
 
-**Prompt: "KING HENRY:", temperature=0.5:**
+**Vanilla model, prompt: "ROMEO:", temperature=0.8:**
 ```
-KING HENRY:
-The father of the marriage of my son,
-And then we will be no longer to be then,
-And but the Lord Hastings of Semiram Stanley.
+ROMEO:
+Good father, cousin, my lord, I could not need me.
+
+First Servant:
+Sir, but you came to this humour of the king,
+Lest hear him withis heart flowers.
 ```
 
 ## Limitations

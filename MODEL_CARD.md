@@ -24,91 +24,30 @@ pipeline_tag: text-generation
   <img src="images/brain_book.png" alt="A glowing neural network brain floating above an open Shakespeare book" width="600">
 </p>
 
-A ~10M parameter language model built **entirely from scratch** in PyTorch — no HuggingFace Transformers, no pretrained weights, no shortcuts. Trained on Shakespeare, modernized with the same architecture used in LLaMA, Qwen, and Mistral.
+<p align="center">
+  <strong>I built a tiny LLM from scratch to understand how GPT-4 and LLaMA actually work.</strong>
+</p>
 
-> Built as a learning project to understand modern LLM architectures from first principles. Every line of code is written from scratch and explained in the [DEVLOG](DEVLOG.md).
+<p align="center">
+  <em>10M parameters. Trained on Shakespeare. Every line of code written from scratch. Every mistake documented.</em>
+</p>
 
-## Architecture
+<p align="center">
+  <a href="https://github.com/brianmeyer/tinyllm">GitHub</a> |
+  <a href="https://github.com/brianmeyer/tinyllm/blob/main/DEVLOG.md">Learning Journal</a>
+</p>
 
-```
-                    tinyllm — Modern Decoder-Only Transformer
-    ┌──────────────────────────────────────────────────────────────┐
-    │                                                              │
-    │   Input: "To be or not to"                                   │
-    │       │                                                      │
-    │       ▼                                                      │
-    │   ┌──────────────────┐                                       │
-    │   │ Token Embedding   │  50,257 tokens → 384 dims            │
-    │   │ (no pos_emb!)     │  Position via RoPE, not learned      │
-    │   └────────┬─────────┘                                       │
-    │            │                                                  │
-    │            ▼                                                  │
-    │   ┌──────────────────────────────────────────────┐  × 6      │
-    │   │  RMSNorm ──→ Multi-Head Attention (6 heads)  │  layers   │
-    │   │                  Q,K rotated by RoPE         │           │
-    │   │                  KV cached for inference     │           │
-    │   │              + residual connection            │           │
-    │   │                                              │           │
-    │   │  RMSNorm ──→ SwiGLU FFN (384→1024→384)      │           │
-    │   │                  gate·up·down with SiLU      │           │
-    │   │              + residual connection            │           │
-    │   └──────────────────────────────────────────────┘           │
-    │            │                                                  │
-    │            ▼                                                  │
-    │   ┌──────────────────┐                                       │
-    │   │ RMSNorm → Linear  │  384 → 50,257 (tied with embedding) │
-    │   └────────┬─────────┘                                       │
-    │            │                                                  │
-    │            ▼                                                  │
-    │   Output: "be" (predicted next token)                        │
-    │                                                              │
-    └──────────────────────────────────────────────────────────────┘
-```
+---
 
-## What makes this "modern"?
+## What is this?
 
-We built a vanilla GPT-2-style transformer first, then swapped in four improvements — one at a time, measuring the effect of each:
+A ~10M parameter decoder-only transformer — no HuggingFace Transformers library, no pretrained weights, no shortcuts. Built from an empty file to a working Shakespeare generator, then modernized with the same architecture used in LLaMA, Qwen, and Mistral.
 
-| Swap | Old (GPT-2 era) | New (LLaMA/Qwen era) | Effect on val loss at 500 steps |
-|------|-----------------|---------------------|-------------------------------|
-| Normalization | LayerNorm | **RMSNorm** | Same (free efficiency win) |
-| FFN activation | ReLU | **SwiGLU** | **-0.11** (faster learning) |
-| Position encoding | Learned embeddings | **RoPE** | **-0.31** (huge improvement) |
-| Inference | Recompute all | **KV Cache** | N/A (1.3x faster generation) |
+This is a learning project. The model itself is tiny and toy-scale. The value is in the code, the [DEVLOG](https://github.com/brianmeyer/tinyllm/blob/main/DEVLOG.md), and the 9 things that went wrong along the way.
 
-**RoPE was the star** — the biggest single improvement, and it achieves this with *fewer* parameters (no positional embedding table needed).
+## It generates Shakespeare
 
-## Training results (Google Colab T4)
-
-| Model | Params | Best Val Loss | Best Step | Time |
-|-------|--------|-------------|-----------|------|
-| Vanilla (char-level) | 10.8M | 1.4837 | 3000 | 59.7 min |
-| **Modern (char-level)** | **10.6M** | **1.4783** | **2500** | **66.9 min** |
-| Modern (BPE) | 29.9M | 4.6414 | 1000 | 68.2 min |
-
-Modern beats vanilla with fewer params and reaches best loss 500 steps sooner.
-
-### Throughput
-
-| Model | tok/s | 300 tokens |
-|-------|-------|-----------|
-| Vanilla (no cache) | 72.2 | 4.16s |
-| Modern (KV cache) | 40.7 | 7.37s |
-
-## Sample outputs
-
-**Vanilla model, temp=0.8:**
-```
-ROMEO:
-Nay, be too be so head: but I am as betimes;
-There is no man with her pleasure attentience,
-She doth behold our queen arms.
-
-PAULINA:
-I'll not too woe to die for the law to the world,
-```
-
-**Modern model, temp=0.8 (KV cached):**
+**Modern model, temp=0.8 (RMSNorm + SwiGLU + RoPE + KV cache):**
 ```
 ROMEO:
 A gallant-house! what says the woe?
@@ -122,7 +61,7 @@ Which hath a sin by him come to the crown,
 That he is reports for me; for ever is he.
 ```
 
-**Vanilla model, temp=0.5 (focused):**
+**Vanilla model, temp=0.5:**
 ```
 KING HENRY:
 The father of the marriage of my son,
@@ -130,73 +69,96 @@ And then we will be no longer to be then,
 And but the Lord Hastings of Semiram Stanley.
 ```
 
-A 10M parameter model trained for ~60 minutes on 1MB of text — producing recognizable Shakespeare with proper character names, dialogue formatting, and verse rhythm.
+Not perfect. But recognizable Shakespeare — proper character names, dialogue formatting, verse rhythm — from a 10M param model trained for ~60 minutes on 1MB of text.
+
+## Architecture
+
+```
+ModernGPT (10.6M params)
+  token_emb:   Embedding(65, 384)
+  blocks × 6:
+    RMSNorm → MultiHeadAttention(6 heads, RoPE, KV cache) → residual
+    RMSNorm → SwiGLU(384 → 1024 → 384) → residual
+  RMSNorm → lm_head (tied with token_emb)
+```
+
+Four upgrades over vanilla GPT-2, each tested in isolation:
+
+| Upgrade | What changed | Impact |
+|---------|-------------|--------|
+| **RMSNorm** | Drop mean subtraction from LayerNorm | Free efficiency win |
+| **SwiGLU** | Smooth gating replaces hard ReLU cutoff | **-0.11** val loss at step 500 |
+| **RoPE** | Rotate Q/K vectors instead of adding position embeddings | **-0.31** val loss at step 500 |
+| **KV Cache** | Cache keys/values during generation | Faster inference |
+
+## Results
+
+| Model | Params | Best Val Loss | Time |
+|-------|--------|-------------|------|
+| Vanilla | 10.8M | 1.4837 | 57 min |
+| **Modern** | **10.6M** | **1.4754** | **67 min** |
+
+Modern beats vanilla with fewer params. RoPE was the star — biggest single improvement.
+
+## 9 things that went wrong
+
+Building this was not smooth. Every failure is documented in the [DEVLOG](https://github.com/brianmeyer/tinyllm/blob/main/DEVLOG.md):
+
+1. MPS training died silently (memory leak)
+2. Bundled all 4 architecture swaps together instead of testing one at a time
+3. Python stdout buffering hid training progress
+4. RoPE position bug in KV cache made the model generate garbage
+5. Modern model memorized Shakespeare (overfitting on 1MB)
+6. Float16 diverged on MPS with 50K BPE vocab
+7. MPS kept killing every retrain attempt
+8. Lost all Colab checkpoints when runtime disconnected
+9. Ran out of free Colab GPU quota
+
+## Training details
+
+| | |
+|---|---|
+| Dataset | Tiny Shakespeare (~1.1MB, 65 unique characters) |
+| Optimizer | AdamW, lr=3e-4 |
+| Batch size | 64, block size 256 |
+| Steps | 5,000 (best checkpoint via early stopping) |
+| Hardware | Google Colab T4 (and an M4 Mac that kept crashing) |
+| Dropout | 0.3 (increased from 0.2 to fight overfitting) |
 
 ## How to use
 
 ```python
 import torch
+import sys
+sys.path.append('src')
 from model_modern import ModernGPT
+from tokenizer import encode, decode
 
-# Load
-device = "mps" if torch.backends.mps.is_available() else "cpu"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 ckpt = torch.load("model.pt", map_location=device, weights_only=False)
 model = ModernGPT(**ckpt["config"]).to(device)
 model.load_state_dict(ckpt["model_state"])
 model.eval()
 
-# Generate
-from tokenizer import encode, decode
 idx = torch.tensor([encode("ROMEO:")], dtype=torch.long, device=device)
 out = model.generate(idx, max_new_tokens=200, temperature=0.8)
 print(decode(out[0].tolist()))
 ```
 
-## Training details
+## What I learned
 
-| Parameter | Value |
-|-----------|-------|
-| Parameters | ~10.6M |
-| Architecture | Decoder-only transformer |
-| Layers | 6 |
-| Heads | 6 |
-| Embedding dim | 384 |
-| Context length | 256 tokens |
-| Vocab | 65 (char-level) / 50,257 (BPE) |
-| Optimizer | AdamW (lr=3e-4) |
-| Training steps | 5,000 |
-| Hardware | Apple M4 Mac Mini (16GB, MPS) |
-| Training time | ~88 minutes |
-| Dataset | Tiny Shakespeare (~1.1MB) |
-
-## The journey
-
-This model was built as a weekend learning project following [Karpathy's build-nanogpt](https://github.com/karpathy/build-nanogpt) as a reference. Every component was implemented from scratch:
-
-1. **Character-level tokenizer** — 65 unique chars, encode/decode, train/val split
-2. **Scaled dot-product attention** — Q/K/V projections, causal mask, dropout
-3. **Multi-head attention** — 6 parallel heads, concatenate + project
-4. **Transformer block** — pre-norm, residual connections, feed-forward network
-5. **Full GPT model** — embeddings, 6 blocks, language model head, weight tying
-6. **Modernization** — RMSNorm, SwiGLU, RoPE, KV cache (each tested in isolation)
-7. **Scaling** — BPE tokenization, mixed precision, gradient accumulation
-
-Full learning journal with detailed explanations of every concept: [DEVLOG.md](DEVLOG.md)
-
-## Key learnings
-
-- **RoPE > learned positional embeddings** by a significant margin, even on tiny data
-- **SwiGLU learns faster** than ReLU but converges to the same floor on small datasets
-- **RMSNorm is a free upgrade** — identical quality, simpler code
-- **MPS (Apple Silicon) works** but kills processes silently on OOM — don't run GPU tasks in parallel on 16GB
-- **Best val loss was at step 3000**, not step 5000 — the model started memorizing Shakespeare after that
+1. **RoPE is the most impactful modern architecture change** — beautiful math, fewer params, better results
+2. **More powerful models overfit faster on small data** — early stopping is essential
+3. **When loss is good but output is garbage, the bug is in inference code** — not the model
+4. **MPS is not ready for serious training** — use CUDA
+5. **Always save checkpoints to persistent storage** — Colab runtimes are ephemeral
+6. **Change one thing at a time and measure** — this is how real ML research works
 
 ## References
 
 - [build-nanogpt](https://github.com/karpathy/build-nanogpt) — Karpathy's step-by-step GPT build
-- [nanochat](https://github.com/karpathy/nanochat) — nanoGPT successor
-- [RoPE paper](https://arxiv.org/abs/2104.09864) — Su et al., "RoFormer"
-- [SwiGLU paper](https://arxiv.org/abs/2002.05202) — Shazeer, "GLU Variants Improve Transformer"
+- [RoPE paper](https://arxiv.org/abs/2104.09864) — Su et al.
+- [SwiGLU paper](https://arxiv.org/abs/2002.05202) — Shazeer
 - [RMSNorm paper](https://arxiv.org/abs/1910.07467) — Zhang & Sennrich
 
 ## License

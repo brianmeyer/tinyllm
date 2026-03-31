@@ -583,6 +583,8 @@ Both produce recognizable Shakespeare with proper character names and dialogue f
 | Modern model overfitted catastrophically | 10M params too powerful for 1MB data | More powerful ≠ better. Modern architecture memorizes tiny datasets faster. Fix: early stopping + more data (BPE helps by making each token carry more information). |
 | **BPE training diverged at step 1000** | **Mixed precision float16 on MPS** | Float16 softmax over 50K vocab overflows on MPS. CUDA has GradScaler to prevent this; MPS doesn't. Fix: use float32, lower lr. **Don't blindly copy CUDA configs to MPS.** |
 | **MPS kills training after 60-80 min** | **MPS memory leak (PyTorch #154329)** | GPU memory grows slowly until macOS OOM-kills the process silently. `empty_cache()` and watermark ratio didn't fix it. **Move to CUDA (Colab) for training over 30 min.** |
+| **Lost all Colab checkpoints** | **Colab runtime disconnected after training** | Free tier runtimes are ephemeral — everything in `/content/` is deleted when the runtime disconnects. 3+ hours of training, gone. **Always mount Google Drive and save checkpoints there.** |
+| **Colab GPU quota exhausted** | **Used all free T4 hours on training** | Free tier gives ~4-6 GPU hours per 24h period. Our 3.2h training run used most of it. Had to wait for quota reset to retrain. **Plan your GPU time. Save to Drive first, not after.** |
 
 ---
 

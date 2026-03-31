@@ -97,13 +97,59 @@ The key insight from this project: **change one thing at a time and measure the 
 
 Switched from character-level to BPE tokenization (50,257 tokens), added mixed precision training (float16), and gradient accumulation to simulate larger batch sizes.
 
-## Sample output
+## Results
 
-*[Generated samples will be added after training completes]*
+### Training (Google Colab T4)
+
+| Model | Params | Best Val Loss | Best Step | Training Time |
+|-------|--------|-------------|-----------|--------------|
+| Vanilla (char-level) | 10.8M | **1.4837** | 3000 | 59.7 min |
+| Modern (char-level) | 10.6M | **1.4783** | 2500 | 66.9 min |
+| Modern (BPE) | 29.9M | 4.6414 | 1000 | 68.2 min |
+
+Modern architecture beats vanilla — better loss, reached faster, with fewer parameters.
+
+### Swap comparison (each tested in isolation, 2000 steps)
+
+| Swap | Val loss at step 500 | vs Vanilla |
+|------|---------------------|-----------|
+| Vanilla (baseline) | 1.99 | — |
+| RMSNorm | 1.99 | same |
+| SwiGLU | 1.88 | **-0.11** |
+| **RoPE** | **1.68** | **-0.31** |
+
+RoPE was the biggest single improvement.
+
+### Sample output (vanilla model, temp=0.8)
+
+```
+ROMEO:
+Nay, be too be so head: but I am as betimes;
+There is no man with her pleasure attentience,
+She doth behold our queen arms.
+
+PAULINA:
+I'll not too woe to die for the law to the world,
+```
+
+### Throughput (Colab T4)
+
+| Model | tok/s | 300 tokens |
+|-------|-------|-----------|
+| Vanilla (no cache) | 72.2 | 4.16s |
+| Modern (KV cache) | 40.7 | 7.37s |
 
 ## What I learned
 
-*[Reflections will be added — see DEVLOG.md for the full journal]*
+1. **RoPE is the most impactful modern architecture change** — 0.31 better at step 500, fewer params, relative position for free
+2. **More powerful models overfit faster on small data** — modern hit best val at step 2500 then degraded. Early stopping is essential.
+3. **MPS (Apple Silicon) has a memory leak** that silently kills training after 60-80 min. Move to CUDA for anything serious.
+4. **Mixed precision float16 diverges on MPS** with large vocabularies. CUDA's GradScaler handles this; MPS doesn't have it.
+5. **BPE only pays off at scale** — 50K vocab on 1MB of data means most embeddings never train properly
+6. **When loss is good but output is garbage, the bug is in inference** — we had a RoPE position bug in KV cache generation that took hours to find
+7. **Change one thing at a time and measure** — the per-swap comparison approach showed exactly what each architectural change contributes
+
+See [DEVLOG.md](DEVLOG.md) for the full learning journal with detailed explanations of every concept, error, and fix.
 
 ## Architecture details
 

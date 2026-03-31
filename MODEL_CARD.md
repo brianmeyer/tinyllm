@@ -78,46 +78,59 @@ We built a vanilla GPT-2-style transformer first, then swapped in four improveme
 
 **RoPE was the star** — the biggest single improvement, and it achieves this with *fewer* parameters (no positional embedding table needed).
 
-## Training results
+## Training results (Google Colab T4)
 
-### Vanilla vs Modern loss curves (character-level, 5000 steps)
+| Model | Params | Best Val Loss | Best Step | Time |
+|-------|--------|-------------|-----------|------|
+| Vanilla (char-level) | 10.8M | 1.4837 | 3000 | 59.7 min |
+| **Modern (char-level)** | **10.6M** | **1.4783** | **2500** | **66.9 min** |
+| Modern (BPE) | 29.9M | 4.6414 | 1000 | 68.2 min |
 
-**Vanilla GPT (LayerNorm + ReLU + learned pos):**
-| Step | Train | Val |
-|------|-------|-----|
-| 0 | 4.19 | 4.19 |
-| 2500 | 1.15 | 1.49 |
-| 5000 | 0.88 | 1.54 |
+Modern beats vanilla with fewer params and reaches best loss 500 steps sooner.
 
-Best val: **1.48** at step 3000 (overfit after)
+### Throughput
+
+| Model | tok/s | 300 tokens |
+|-------|-------|-----------|
+| Vanilla (no cache) | 72.2 | 4.16s |
+| Modern (KV cache) | 40.7 | 7.37s |
 
 ## Sample outputs
 
-**Prompt: "ROMEO:" at temperature 0.8:**
+**Vanilla model, temp=0.8:**
 ```
 ROMEO:
-Thither the forest world they are.
+Nay, be too be so head: but I am as betimes;
+There is no man with her pleasure attentience,
+She doth behold our queen arms.
 
-MERCUTIO:
-No better for the court.
-
-MERCUTIO:
-Let us always be for contented: have you not slander'd
-therein like less behind than than offends it, and he
-discharged in Verona his report.
+PAULINA:
+I'll not too woe to die for the law to the world,
 ```
 
-**Prompt: "ROMEO:" at temperature 0.5:**
+**Modern model, temp=0.8 (KV cached):**
 ```
 ROMEO:
-I would be so straitly for thee for thy heart.
+A gallant-house! what says the woe?
 
-BENVOLIO:
-By this and look on thee, who were thy son
-As if thou couldst desire to thy love.
+MERCUTIO:
+Good madam, my lord.
+
+ROMEO:
+Villain, for I do not say it is true,
+Which hath a sin by him come to the crown,
+That he is reports for me; for ever is he.
 ```
 
-A 10M parameter model trained for 88 minutes on 1MB of text — producing recognizable Shakespeare with proper character names, dialogue formatting, and verse rhythm.
+**Vanilla model, temp=0.5 (focused):**
+```
+KING HENRY:
+The father of the marriage of my son,
+And then we will be no longer to be then,
+And but the Lord Hastings of Semiram Stanley.
+```
+
+A 10M parameter model trained for ~60 minutes on 1MB of text — producing recognizable Shakespeare with proper character names, dialogue formatting, and verse rhythm.
 
 ## How to use
 

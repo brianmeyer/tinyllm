@@ -456,17 +456,119 @@ After the BPE divergence, we tried retraining the modern model with fixes:
 
 **Lesson**: MPS is great for inference and short training runs. For anything over 30 minutes, use CUDA. Don't fight the hardware — use the right tool for the job. This cost us several hours of debugging that could have been spent learning.
 
-### BPE Training — Take 2 (Colab T4, float32, lr=1e-4, dropout=0.3)
+### Colab Training Results — All Three Phases
 
-*[Results pending — running on Colab]*
+Ran `train_colab.py` on a free T4 GPU. All three training phases ran back-to-back with zero crashes. Total wall time: ~3.2 hours. CUDA just works.
+
+#### Part 1: Vanilla GPT (59.7 min, best val 1.4837)
+
+| Step | Train | Val | Status |
+|------|-------|-----|--------|
+| 0 | 4.23 | 4.23 | best, saved |
+| 500 | 1.79 | 1.93 | best, saved |
+| 1000 | 1.41 | 1.63 | best, saved |
+| 1500 | 1.28 | 1.55 | best, saved |
+| 2000 | 1.19 | 1.50 | best, saved |
+| 2500 | 1.13 | 1.48 | best, saved |
+| **3000** | **1.08** | **1.48** | **best, saved** |
+| 3500 | 1.02 | 1.49 | overfitting starts |
+| 4000 | 0.97 | 1.51 | |
+| 4500 | 0.92 | 1.54 | |
+| 5000 | 0.86 | 1.56 | |
+
+Best checkpoint at step 3000. After that, val loss climbs while train keeps dropping — classic overfitting on a small dataset.
+
+#### Part 2: Modern GPT with dropout 0.3 (66.9 min, best val 1.4783)
+
+| Step | Train | Val | Status |
+|------|-------|-----|--------|
+| 0 | 4.32 | 4.32 | best, saved |
+| 500 | 1.47 | 1.67 | best, saved |
+| 1000 | 1.29 | 1.53 | best, saved |
+| 1500 | 1.21 | 1.50 | best, saved |
+| 2000 | 1.14 | 1.48 | best, saved |
+| **2500** | **1.09** | **1.48** | **best, saved** |
+| 3000 | 1.05 | 1.48 | |
+| 3500 | 1.00 | 1.48 | plateau |
+| 4000 | 0.96 | 1.50 | overfitting starts |
+| 4500 | 0.91 | 1.52 | |
+| 5000 | 0.87 | 1.55 | |
+
+**Modern beat vanilla**: best val 1.4783 vs 1.4837. Small margin, but modern got there 500 steps sooner (step 2500 vs step 3000). The dropout 0.3 was the key fix — it pushed the overfitting point from step 1500 (with dropout 0.2) to step 2500.
+
+**Head-to-head at each step:**
+
+| Step | Vanilla val | Modern val | Modern advantage |
+|------|-----------|-----------|-----------------|
+| 500 | 1.93 | 1.67 | **-0.26** |
+| 1000 | 1.63 | 1.53 | **-0.10** |
+| 2000 | 1.50 | 1.48 | **-0.02** |
+| Best | 1.4837 (step 3000) | **1.4783** (step 2500) | **-0.005, 500 steps faster** |
+
+#### Part 3: BPE + Modern + Gradient Accumulation (68.2 min, best val 4.6414)
+
+| Step | Train | Val | Status |
+|------|-------|-----|--------|
+| 0 | 10.94 | 10.94 | Random over 50K vocab (ln(50257) ≈ 10.83) |
+| 500 | 4.32 | 4.85 | best, saved |
+| **1000** | **3.64** | **4.64** | **best, saved** |
+| 1500 | 3.15 | 4.77 | overfitting |
+| 2000 | 2.71 | 4.93 | |
+| 3000 | 2.04 | 5.43 | severe overfitting |
+
+**BPE overfits even faster** — 29.9M params (mostly the 50K embedding table) on only 338K BPE tokens. The model memorizes the training data by step 1000. Best checkpoint saved at step 1000.
+
+**Note on BPE loss numbers**: You can't directly compare BPE loss (4.64) to char-level loss (1.48) because they're predicting over different vocabularies. BPE perplexity = e^4.64 ≈ 103 (choosing among ~103 tokens). Char-level perplexity = e^1.48 ≈ 4.4 (choosing among ~4.4 characters). The BPE model is actually doing harder predictions — each token carries more information.
+
+**Lesson**: BPE with a 50K vocab on 1MB of Shakespeare is a terrible ratio. The embedding table alone (50,257 × 384 = 19.3M params) is larger than the rest of the model combined. You need millions of tokens to train those embeddings properly. This is why real LLMs train on trillions of tokens — BPE only pays off at scale.
+
+### Generated Samples — Colab T4
+
+**Vanilla model, temp=0.8:**
+```
+ROMEO:
+Nay, be too be so head: but I am as betimes;
+There is no man with her pleasure attentience,
+She doth behold our queen arms.
+
+PAULINA:
+I'll not too woe to die for the law to the world,
+I'll be old fas
+```
+
+**Modern model, temp=0.8 (KV cached):**
+```
+ROMEO:
+A gallant-house! what says the woe?
+
+MERCUTIO:
+Good madam, my lord.
+
+ROMEO:
+Villain, for I do not say it is true,
+Which hath a sin by him come to the crown,
+That he is reports for me; for ever is he.
+```
+
+Both produce recognizable Shakespeare with proper character names and dialogue formatting. The modern model's output is slightly more coherent — shorter sentences, cleaner dialogue turns.
+
+### Throughput Benchmarks — Colab T4
+
+| Model | Throughput | Time for 300 tokens |
+|-------|----------|-------------------|
+| Vanilla (no cache) | **72.2 tok/s** | 4.16s |
+| Modern (KV cache) | 40.7 tok/s | 7.37s |
+
+**Surprise**: Vanilla is faster! The modern model's KV cache overhead (managing cache state, extra RoPE computation) outweighs the cache benefit at this tiny sequence length (256 tokens). KV cache pays off at longer contexts (2048+). At our scale, the extra complexity slows things down.
+
+**This is another real lesson**: Architecture improvements that win at scale can lose at small scale. RoPE + SwiGLU + KV cache are designed for billion-parameter models processing thousands of tokens. At 10M params and 256 tokens, the simpler vanilla architecture has less overhead.
 
 ---
 
-## Phase 5: Publish — [pending]
+## Phase 5: Publish
 
-- Generate Shakespeare samples at different temperatures
-- Push code to GitHub
-- Upload model + model card to HuggingFace as `bmeyer2025/tiny-gpt-shakespeare`
+- Code pushed to GitHub: [brianmeyer/tinyllm](https://github.com/brianmeyer/tinyllm)
+- HuggingFace: `bmeyer2025/tiny-gpt-shakespeare` (pending checkpoint download from Colab)
 
 ---
 

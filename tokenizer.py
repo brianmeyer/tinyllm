@@ -11,7 +11,12 @@ import torch
 DATA_PATH  = "data/input.txt"
 BLOCK_SIZE = 256   # context length (tokens per sample)
 BATCH_SIZE = 64    # samples per batch
-DEVICE     = "mps" if torch.backends.mps.is_available() else "cpu"
+if torch.cuda.is_available():
+    DEVICE = "cuda"
+elif torch.backends.mps.is_available():
+    DEVICE = "mps"
+else:
+    DEVICE = "cpu"
 
 # ── Load data ─────────────────────────────────────────────────────────────────
 with open(DATA_PATH, "r") as f:

@@ -17,17 +17,23 @@ REPO_ID = "bmeyer2025/tiny-gpt-shakespeare"
 FILES = {
     "checkpoints/modern_bpe_gpt.pt": "model.pt",
     "checkpoints/config.json":       "config.json",
-    "README.md":                     "README.md",
     "DEVLOG.md":                     "DEVLOG.md",
 
     # Source code (so people can load and run the model)
-    "tokenizer.py":                  "src/tokenizer.py",
-    "attention.py":                  "src/attention.py",
-    "transformer.py":                "src/transformer.py",
-    "model.py":                      "src/model.py",
-    "modernize.py":                  "src/modernize.py",
-    "model_modern.py":               "src/model_modern.py",
-    "generate.py":                   "src/generate.py",
+    "src/tokenizer.py":              "src/tokenizer.py",
+    "src/attention.py":              "src/attention.py",
+    "src/transformer.py":            "src/transformer.py",
+    "src/model.py":                  "src/model.py",
+    "src/modernize.py":              "src/modernize.py",
+    "src/model_modern.py":           "src/model_modern.py",
+    "src/generate.py":               "src/generate.py",
+
+    # Images
+    "images/brain_book.png":         "images/brain_book.png",
+    "images/robot_shakespeare.png":  "images/robot_shakespeare.png",
+
+    # Model card (HuggingFace uses this as the repo README)
+    "MODEL_CARD.md":                 "README.md",
 }
 
 
